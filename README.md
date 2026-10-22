@@ -18,27 +18,45 @@ The labels are class indices, `0` to the number of classes.
 | --- | --- |
 | `folds(labels, seed, k)` | the fold of every row, in the order of the rows |
 | `split(labels, seed, k, f)` | the rows that test in fold `f`, and the rows that train |
+| `test_of(fs, f)` | the rows that test in fold `f`, given the fold list |
+| `train_of(fs, f)` | the rows that train in fold `f`, given the fold list |
 
 `split` gives the indices of the rows, so the rows themselves are picked
-out of the dataset by index.
+out of the dataset by index. `test_of` and `train_of` take the fold list
+instead, so the folds are computed once and asked of as many times as
+needed.
 
 ## What is proved
 
-- **Every row of the dataset is placed in a fold** (`split_covers`). The
-  kernel proves it; the proof is an induction over the rows. The fold
-  list holds one entry per row, so the folds are a partition of the
-  rows: the test rows of a fold and its training rows are disjoint, and
-  together they hold every row.
+- **Every row of the dataset is placed in a fold** (`split_covers`). Bend's
+  checker proves it; the proof is an induction over the rows. The fold
+  list holds one entry per row, so the folds cover the dataset exactly
+  once each: the test rows of a fold and its training rows are
+  disjoint, and together they hold every row. The split walks the fold
+  list and appends each index to one side or the other, so a row is in
+  one side only.
 - **The shape of every result is in the type.** `split` gives a `Split`
-  holding two `List<&2, Nat>`, and the checker verifies the index of
-  every row against the fold it belongs to.
+  holding two `List<&2, Nat>` — the indices of the rows — and the
+  checker verifies it.
+
+## What the verdict says
+
+The Lean kernel's verdict for this package is a **refusal to certify**:
+`bend-kit-random` carries two defs that call the operating system
+(`entropy` and `from_os`), and the verdict refuses a book that holds any
+foreign code. The split never calls them — it seeds the generator
+itself — but they are in the dependency, and the verdict cannot tell the
+difference. So the law above is *checked* by Bend's checker, not
+certified by the kernel; the metrics package's law, which has no such
+dependency, is.
 
 ## What is only tested
 
 - **The numbers.** The folds are compared with scikit-learn's
-  `StratifiedKFold` (`reference/test_split.py`): the same seed gives the
-  same split every time, the folds hold the same classes in the same
-  proportions, and every row is in exactly one fold. The two programs do
-  not agree on *which* rows go where — scikit-learn shuffles with
-  numpy's generator, this package with bend-kit-random's — so the
-  comparison is of the shape of the split, not of its exact contents.
+  `StratifiedKFold` (`reference/test_split.py`): every fold holds the
+  same number of rows, every fold holds the same number of rows of every
+  class, every row is in exactly one fold, and the same seed gives the
+  same split while another seed gives another. The two programs do not
+  agree on *which* rows go where — scikit-learn shuffles with numpy's
+  generator, this package with bend-kit-random's — so the comparison is
+  of the shape of the split, not of its exact contents.
